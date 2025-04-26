@@ -10,6 +10,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Verificar e instalar WSL
+        shell: pwsh
         run: |
           # Check if WSL is installed
           if (!(wsl --list > $null 2>&1)) {
