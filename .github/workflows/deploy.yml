@@ -9,7 +9,8 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Verificar e instalar WSL
+      - name: Verificar e instalar WSL (somente no Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           # Check if WSL is installed
@@ -18,16 +19,24 @@ jobs:
             wsl --install
           }
 
-          # Ensure Ubuntu-24.04 is installed and set to WSL 2
-          if (!(wsl --list | Select-String -Pattern "Ubuntu-24.04")) {
-            echo "Ubuntu-24.04 distribution not found. Please install it manually."
+          # Ensure Ubuntu-22.04 is installed and set to WSL 2
+          if (!(wsl --list | Select-String -Pattern "Ubuntu-22.04")) {
+            echo "Ubuntu-22.04 distribution not found. Please install it manually."
             exit 1
           }
 
-          # Set WSL version to 2 for Ubuntu-24.04
-          wsl --set-version Ubuntu-24.04 2
+          # Set WSL version to 2 for Ubuntu-22.04
+          wsl --set-version Ubuntu-22.04 2
+
+      - name: Verificar instalação do Docker
+        run: |
+          if (!(docker --version > $null 2>&1)) {
+            echo "Docker not found. Please ensure Docker is installed and running."
+            exit 1
+          }
 
       - name: Atualizar e instalar dependências no WSL
+        if: runner.os == 'Windows'
         run: |
           wsl sudo apt-get update
           wsl sudo apt-get install -y dos2unix
@@ -36,7 +45,8 @@ jobs:
         run: |
           docker build --build-arg USERNAME=${{ secrets.USERNAME }} --build-arg PASSWORD=${{ secrets.PASSWORD }} -t meu-linux-container .
 
-      - name: Criar diretório para volume
+      - name: Criar diretório para volume (somente no Windows)
+        if: runner.os == 'Windows'
         run: |
           if (!(Test-Path -Path "C:\Conteiner\Documents")) {
             New-Item -ItemType Directory -Path "C:\Conteiner\Documents"
@@ -44,16 +54,40 @@ jobs:
 
       - name: Rodar contêiner Linux com volume
         run: |
-          docker run -dit --name linux-dev -v C:\Conteiner\Documents:/mnt meu-linux-container
+          if (${{ runner.os }} == 'Windows') {
+            docker run -dit --name linux-dev -v C:\Conteiner\Documents:/mnt meu-linux-container
+          } else {
+            docker run -dit --name linux-dev -v /home/runner/conteiner/Documents:/mnt meu-linux-container
+          }
 
       - name: Criar e executar script no contêiner
         run: |
-          echo '#!/bin/bash' > C:\Conteiner\Documents\script.sh
-          echo 'echo "Automação funcionando!"' >> C:\Conteiner\Documents\script.sh
-          wsl dos2unix /mnt/script.sh
-          wsl chmod +x /mnt/script.sh
-          wsl bash /mnt/script.sh
+          # Definir caminho do script com base no sistema operacional
+          if (${{ runner.os }} == 'Windows') {
+            $scriptPath = "C:\Conteiner\Documents\script.sh"
+            mkdir -Force "C:\Conteiner\Documents"
+          } else {
+            $scriptPath = "/home/runner/conteiner/Documents/script.sh"
+            mkdir -p /home/runner/conteiner/Documents
+          }
 
-      - name: Iniciar terminal dentro do contêiner
+          # Criar script
+          echo '#!/bin/bash' > $scriptPath
+          echo 'useradd -m -s /bin/bash convidado' >> $scriptPath
+          echo 'passwd -d convidado' >> $scriptPath
+          echo 'echo "Por favor, defina uma senha para o usuário convidado:"' >> $scriptPath
+          echo 'passwd convidado' >> $scriptPath
+
+          # Ajustar permissões e executar script
+          if (${{ runner.os }} == 'Windows') {
+            wsl dos2unix /mnt/script.sh
+            wsl chmod +x /mnt/script.sh
+            wsl bash /mnt/script.sh
+          } else {
+            chmod +x $scriptPath
+            bash $scriptPath
+          }
+
+      - name: Iniciar terminal dentro do contêiner como usuário convidado
         run: |
-          docker exec -it linux-dev bash
+          docker exec -it --user convidado linux-dev bash
