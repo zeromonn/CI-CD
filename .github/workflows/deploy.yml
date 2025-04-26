@@ -18,14 +18,14 @@ jobs:
             wsl --install
           }
 
-          # Ensure Ubuntu is installed and set to WSL 2
-          if (!(wsl --list | Select-String -Pattern "Ubuntu")) {
-            echo "Ubuntu distribution not found. Please install it manually."
+          # Ensure Ubuntu-24.04 is installed and set to WSL 2
+          if (!(wsl --list | Select-String -Pattern "Ubuntu-24.04")) {
+            echo "Ubuntu-24.04 distribution not found. Please install it manually."
             exit 1
           }
 
-          # Set WSL version to 2 for Ubuntu
-          wsl --set-version Ubuntu 2
+          # Set WSL version to 2 for Ubuntu-24.04
+          wsl --set-version Ubuntu-24.04 2
 
       - name: Atualizar e instalar dependências no WSL
         run: |
