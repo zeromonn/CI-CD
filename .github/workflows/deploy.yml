@@ -11,10 +11,20 @@ jobs:
 
       - name: Verificar e instalar WSL
         run: |
-          if (!(wsl --list)) {
+          # Check if WSL is installed
+          if (!(wsl --list > $null 2>&1)) {
+            echo "WSL not found. Installing..."
             wsl --install
-            wsl --set-version Ubuntu 2
           }
+
+          # Ensure Ubuntu is installed and set to WSL 2
+          if (!(wsl --list | Select-String -Pattern "Ubuntu")) {
+            echo "Ubuntu distribution not found. Please install it manually."
+            exit 1
+          }
+
+          # Set WSL version to 2 for Ubuntu
+          wsl --set-version Ubuntu 2
 
       - name: Atualizar e instalar dependências no WSL
         run: |
