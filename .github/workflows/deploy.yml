@@ -1,0 +1,48 @@
+name: Deploy Linux Container
+
+on: [push]
+
+jobs:
+  build-and-run:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Verificar e instalar WSL
+        run: |
+          if (!(wsl --list)) {
+            wsl --install
+            wsl --set-version Ubuntu 2
+          }
+
+      - name: Atualizar e instalar dependências no WSL
+        run: |
+          wsl sudo apt-get update
+          wsl sudo apt-get install -y dos2unix
+
+      - name: Construir imagem Docker
+        run: |
+          docker build --build-arg USERNAME=${{ secrets.USERNAME }} --build-arg PASSWORD=${{ secrets.PASSWORD }} -t meu-linux-container .
+
+      - name: Criar diretório para volume
+        run: |
+          if (!(Test-Path -Path "C:\Conteiner\Documents")) {
+            New-Item -ItemType Directory -Path "C:\Conteiner\Documents"
+          }
+
+      - name: Rodar contêiner Linux com volume
+        run: |
+          docker run -dit --name linux-dev -v C:\Conteiner\Documents:/mnt meu-linux-container
+
+      - name: Criar e executar script no contêiner
+        run: |
+          echo '#!/bin/bash' > C:\Conteiner\Documents\script.sh
+          echo 'echo "Automação funcionando!"' >> C:\Conteiner\Documents\script.sh
+          wsl dos2unix /mnt/script.sh
+          wsl chmod +x /mnt/script.sh
+          wsl bash /mnt/script.sh
+
+      - name: Iniciar terminal dentro do contêiner
+        run: |
+          docker exec -it linux-dev bash

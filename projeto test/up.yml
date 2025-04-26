@@ -1,0 +1,13 @@
+version: '3'
+services:
+  meu-programa:
+    image: meu-programa-python
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - bd:/vol/bd  # Mapeia o volume para o caminho /vol/bd no contêiner
+    restart: always
+
+volumes:
+  bd:  # Define o volume chamado "bd"
