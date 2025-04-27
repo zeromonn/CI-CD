@@ -4,74 +4,40 @@ on: [push]
 
 jobs:
   build-and-run:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Verificar e instalar WSL (somente no Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          # Check if WSL is installed
-          if (!(wsl --list > $null 2>&1)) {
-            echo "WSL not found. Installing..."
-            wsl --install
-          }
-
-          # Ensure Ubuntu-22.04 is installed and set to WSL 2
-          if (!(wsl --list | Select-String -Pattern "Ubuntu-22.04")) {
-            echo "Ubuntu-22.04 distribution not found. Please install it manually."
-            exit 1
-          }
-
-          # Set WSL version to 2 for Ubuntu-22.04
-          wsl --set-version Ubuntu-22.04 2
-
       - name: Verificar instalação do Docker
         run: |
-          if (!(docker --version > $null 2>&1)) {
+          if !(docker --version > /dev/null 2>&1); then
             echo "Docker not found. Please ensure Docker is installed and running."
             exit 1
-          }
+          fi
 
-      - name: Atualizar e instalar dependências no WSL
-        if: runner.os == 'Windows'
+      - name: Atualizar e instalar dependências
         run: |
-          wsl sudo apt-get update
-          wsl sudo apt-get install -y dos2unix
+          sudo apt-get update
+          sudo apt-get install -y dos2unix
 
       - name: Construir imagem Docker
         run: |
           docker build --build-arg USERNAME=${{ secrets.USERNAME }} --build-arg PASSWORD=${{ secrets.PASSWORD }} -t meu-linux-container .
 
-      - name: Criar diretório para volume (somente no Windows)
-        if: runner.os == 'Windows'
+      - name: Criar diretório para volume
         run: |
-          if (!(Test-Path -Path "C:\Conteiner\Documents")) {
-            New-Item -ItemType Directory -Path "C:\Conteiner\Documents"
-          }
+          mkdir -p ~/conteiner/Documents
 
       - name: Rodar contêiner Linux com volume
         run: |
-          if (${{ runner.os }} == 'Windows') {
-            docker run -dit --name linux-dev -v C:\Conteiner\Documents:/mnt meu-linux-container
-          } else {
-            docker run -dit --name linux-dev -v /home/runner/conteiner/Documents:/mnt meu-linux-container
-          }
+          docker run -dit --name linux-dev -v ~/conteiner/Documents:/mnt meu-linux-container
 
       - name: Criar e executar script no contêiner
         run: |
-          # Definir caminho do script com base no sistema operacional
-          if (${{ runner.os }} == 'Windows') {
-            $scriptPath = "C:\Conteiner\Documents\script.sh"
-            mkdir -Force "C:\Conteiner\Documents"
-          } else {
-            $scriptPath = "/home/runner/conteiner/Documents/script.sh"
-            mkdir -p /home/runner/conteiner/Documents
-          }
-
           # Criar script
+          scriptPath=~/conteiner/Documents/script.sh
+          mkdir -p ~/conteiner/Documents
           echo '#!/bin/bash' > $scriptPath
           echo 'useradd -m -s /bin/bash convidado' >> $scriptPath
           echo 'passwd -d convidado' >> $scriptPath
@@ -79,14 +45,10 @@ jobs:
           echo 'passwd convidado' >> $scriptPath
 
           # Ajustar permissões e executar script
-          if (${{ runner.os }} == 'Windows') {
-            wsl dos2unix /mnt/script.sh
-            wsl chmod +x /mnt/script.sh
-            wsl bash /mnt/script.sh
-          } else {
-            chmod +x $scriptPath
-            bash $scriptPath
-          }
+          dos2unix $scriptPath
+          chmod +x $scriptPath
+          docker cp $scriptPath linux-dev:/mnt/script.sh
+          docker exec linux-dev bash /mnt/script.sh
 
       - name: Iniciar terminal dentro do contêiner como usuário convidado
         run: |
