@@ -1,15 +1,18 @@
 FROM ubuntu:22.04
 
-# Atualizar pacotes e instalar dependências
-RUN apt-get update && apt-get install -y curl git vim sudo
+# Atualizar e instalar pacotes necessários
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    vim \
+    dos2unix \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Adicionar usuário com variáveis de ambiente
-ARG USERNAME
-ARG PASSWORD
-RUN useradd -m $USERNAME && echo "$USERNAME:$PASSWORD" | chpasswd && adduser $USERNAME sudo
+# Definir o diretório de trabalho
+WORKDIR /app
 
-# Definir diretório de trabalho
-WORKDIR /home/$USERNAME
+# Copiar arquivos necessários para o contêiner
+COPY . /app
 
 # Comando padrão
 CMD ["/bin/bash"]
